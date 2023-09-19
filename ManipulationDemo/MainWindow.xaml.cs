@@ -15,6 +15,7 @@ using System.Management;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.Win32;
 
 namespace ManipulationDemo
 {
@@ -107,7 +108,7 @@ namespace ManipulationDemo
 
         private readonly DispatcherTimer _timer;
 
-        private void OnTick(object sender, EventArgs e)
+        private unsafe void OnTick(object sender, EventArgs e)
         {
             try
             {
@@ -154,11 +155,46 @@ namespace ManipulationDemo
                             device.Name, device.StylusDevices.Count, tabletSize));
                     }
                 }
+
+                AppendPointerDeviceInfo(builder);
+
                 PhysicalSizeRun.Text = builder.ToString();
             }
             catch (Exception ex)
             {
                 PhysicalSizeRun.Text = ex.ToString();
+            }
+        }
+
+        /// <summary>
+        /// 添加 Pointer 消息的信息
+        /// </summary>
+        /// <param name="stringBuilder"></param>
+        private static unsafe void AppendPointerDeviceInfo(StringBuilder stringBuilder)
+        {
+            try
+            {
+                // 获取 Pointer 设备数量
+                uint deviceCount = 0;
+                PInvoke.GetPointerDevices(ref deviceCount,
+                    (Windows.Win32.UI.Controls.POINTER_DEVICE_INFO*)IntPtr.Zero);
+                Windows.Win32.UI.Controls.POINTER_DEVICE_INFO[] pointerDeviceInfo =
+                    new Windows.Win32.UI.Controls.POINTER_DEVICE_INFO[deviceCount];
+                fixed (Windows.Win32.UI.Controls.POINTER_DEVICE_INFO* pDeviceInfo = &pointerDeviceInfo[0])
+                {
+                    // 这里需要拿两次，第一次获取数量，第二次获取信息
+                    PInvoke.GetPointerDevices(ref deviceCount, pDeviceInfo);
+                    stringBuilder.AppendLine($"PointerDeviceCount:{deviceCount} 设备列表：");
+                    foreach (var info in pointerDeviceInfo)
+                    {
+                        stringBuilder.AppendLine($" - {info.productString}");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                // 也许是在非 Win8 或以上的系统，抛出找不到方法，这个 GetPointerDevices 方法是 Win8 加的
+                // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getpointerdevices
             }
         }
 
@@ -242,7 +278,7 @@ namespace ManipulationDemo
             // 检查硬件设备插拔。
             if (msg == (int) WindowMessages.DEVICECHANGE)
             {
-                var eventText = $"Event={(WindowsMessageDeviceChangeEventEnum)wparam}";
+                var eventText = $"Event={(WindowsMessageDeviceChangeEventEnum) wparam}";
 
                 Log(DeviceChangeListenerTextBlock, $"[WM_DEVICECHANGE]设备发生插拔 0x{wparam.ToString("X4")}-0x{lparam.ToString("X4")};{eventText}", true);
                 LogDevices();
