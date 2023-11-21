@@ -60,7 +60,6 @@ namespace ManipulationDemo
             internal short Name;
         }
 
-
         [StructLayout(LayoutKind.Sequential)]
         public struct DEV_BROADCAST_HDR
         {
