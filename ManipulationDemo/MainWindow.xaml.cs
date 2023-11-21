@@ -13,6 +13,7 @@ using System.Windows.Threading;
 using ManipulationDemo.Properties;
 using System.Management;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.Win32;
@@ -28,6 +29,8 @@ namespace ManipulationDemo
         {
             InitializeComponent();
             this.RemoveIcon();
+
+            Loaded += MainWindow_Loaded;
 
             var args = Environment.GetCommandLineArgs();
             if (args.Contains("--startup"))
@@ -90,6 +93,21 @@ namespace ManipulationDemo
             catch (Exception e)
             {
                 // 忽略
+            }
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            var typeFromClsid = Type.GetTypeFromCLSID(new Guid("A5B020FD-E04B-4e67-B65A-E7DEED25B2CF"));
+            object comObject = Activator.CreateInstance(typeFromClsid);
+
+            var manager = comObject as ITabletManager;
+            manager!.GetTabletCount(out var tabletCount);
+            for (uint i = 0; i < tabletCount; i++)
+            {
+                manager.GetTablet(i, out var tablet);
+
+                tablet.GetName(out var name);
             }
         }
 
