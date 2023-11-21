@@ -44,7 +44,7 @@ namespace ManipulationDemo
             UnregisterDeviceNotification(_notificationHandle);
         }
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern IntPtr RegisterDeviceNotification(IntPtr recipient, IntPtr notificationFilter, int flags);
 
         [DllImport("user32.dll")]
@@ -76,7 +76,8 @@ namespace ManipulationDemo
             public int dbcc_devicetype;
             public int dbcc_reserved;
             public Guid dbcc_classguid;
-            //public char[] dbcc_name;
+            //[MarshalAs(UnmanagedType.LPUTF8Str)]
+            //public string dbcc_name;
         }
     }
 }
