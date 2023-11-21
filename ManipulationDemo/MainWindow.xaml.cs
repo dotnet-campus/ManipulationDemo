@@ -290,7 +290,7 @@ namespace ManipulationDemo
 
                 if (isDeviceArrival || isDeviceRemoveComplete)
                 {
-                    // 设备被移除或插入，试试拿到具体是哪个社保
+                    // 设备被移除或插入，试试拿到具体是哪个设备
                     DEV_BROADCAST_HDR hdr =
                         (DEV_BROADCAST_HDR) Marshal.PtrToStructure(lparam, typeof(DEV_BROADCAST_HDR));
                     if (hdr.dbch_devicetype == UsbNotification.DbtDevtypDeviceinterface)
@@ -299,10 +299,17 @@ namespace ManipulationDemo
                             (DEV_BROADCAST_DEVICEINTERFACE) Marshal.PtrToStructure(lparam,
                                 typeof(DEV_BROADCAST_DEVICEINTERFACE));
 
+                        var classguid = deviceInterface.dbcc_classguid;
+                        // 这里的 classguid 默认会带上 name 上，于是就用不着
+
                         var size = Marshal.SizeOf(typeof(DEV_BROADCAST_DEVICEINTERFACE));
                         var namePtr = lparam + size;
                         var length = hdr.dbch_size - size; // 尽管 length 部分都是字符串的内容，然而字符串却是设计为 \0 结束方式
                         var name = Marshal.PtrToStringUni(namePtr);
+                        if (string.IsNullOrEmpty(name))
+                        {
+                            name = "读取不到设备名";
+                        }
 
                         string pid = string.Empty;
                         string vid = string.Empty;
