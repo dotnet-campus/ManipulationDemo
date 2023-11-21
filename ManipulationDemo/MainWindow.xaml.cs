@@ -304,8 +304,10 @@ namespace ManipulationDemo
 
                         var size = Marshal.SizeOf(typeof(DEV_BROADCAST_DEVICEINTERFACE));
                         var namePtr = lparam + size;
-                        var length = hdr.dbch_size - size; // 尽管 length 部分都是字符串的内容，然而字符串却是设计为 \0 结束方式
-                        var name = Marshal.PtrToStringUni(namePtr);
+                        var nameSize = hdr.dbch_size - size;
+                        // 使用 Unicode 读取的话，一个字符是两个字节
+                        var charLength = nameSize / 2;
+                        var name = Marshal.PtrToStringUni(namePtr, charLength);
                         if (string.IsNullOrEmpty(name))
                         {
                             name = "读取不到设备名";
