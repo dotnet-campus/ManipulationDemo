@@ -75,7 +75,6 @@ namespace ManipulationDemo
             public int dbcc_devicetype;
             public int dbcc_reserved;
             public Guid dbcc_classguid;
-            //[MarshalAs(UnmanagedType.LPUTF8Str)]
             //public string dbcc_name;
         }
     }
