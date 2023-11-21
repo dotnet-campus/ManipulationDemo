@@ -15,6 +15,10 @@ using System.Management;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.Win32;
+using static ManipulationDemo.UsbNotification;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace ManipulationDemo
 {
@@ -107,7 +111,7 @@ namespace ManipulationDemo
 
         private readonly DispatcherTimer _timer;
 
-        private void OnTick(object sender, EventArgs e)
+        private unsafe void OnTick(object sender, EventArgs e)
         {
             try
             {
@@ -154,11 +158,46 @@ namespace ManipulationDemo
                             device.Name, device.StylusDevices.Count, tabletSize));
                     }
                 }
+
+                AppendPointerDeviceInfo(builder);
+
                 PhysicalSizeRun.Text = builder.ToString();
             }
             catch (Exception ex)
             {
                 PhysicalSizeRun.Text = ex.ToString();
+            }
+        }
+
+        /// <summary>
+        /// 添加 Pointer 消息的信息
+        /// </summary>
+        /// <param name="stringBuilder"></param>
+        private static unsafe void AppendPointerDeviceInfo(StringBuilder stringBuilder)
+        {
+            try
+            {
+                // 获取 Pointer 设备数量
+                uint deviceCount = 0;
+                PInvoke.GetPointerDevices(ref deviceCount,
+                    (Windows.Win32.UI.Controls.POINTER_DEVICE_INFO*) IntPtr.Zero);
+                Windows.Win32.UI.Controls.POINTER_DEVICE_INFO[] pointerDeviceInfo =
+                    new Windows.Win32.UI.Controls.POINTER_DEVICE_INFO[deviceCount];
+                fixed (Windows.Win32.UI.Controls.POINTER_DEVICE_INFO* pDeviceInfo = &pointerDeviceInfo[0])
+                {
+                    // 这里需要拿两次，第一次获取数量，第二次获取信息
+                    PInvoke.GetPointerDevices(ref deviceCount, pDeviceInfo);
+                    stringBuilder.AppendLine($"PointerDeviceCount:{deviceCount} 设备列表：");
+                    foreach (var info in pointerDeviceInfo)
+                    {
+                        stringBuilder.AppendLine($" - {info.productString}");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                // 也许是在非 Win8 或以上的系统，抛出找不到方法，这个 GetPointerDevices 方法是 Win8 加的
+                // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getpointerdevices
             }
         }
 
@@ -230,7 +269,8 @@ namespace ManipulationDemo
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            var source = (HwndSource) PresentationSource.FromVisual(this);
+            var source = (HwndSource) PresentationSource.FromVisual(this)!;
+            UsbNotification.RegisterUsbDeviceNotification(source.Handle);
             source?.AddHook(HwndHook);
 
             Log("程序启动时");
@@ -240,20 +280,80 @@ namespace ManipulationDemo
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam, ref bool handled)
         {
             // 检查硬件设备插拔。
-            if (msg == (int) WindowMessages.DEVICECHANGE)
+            if (msg == (int)WindowMessages.DEVICECHANGE)
             {
-                var eventText = $"Event={(WindowsMessageDeviceChangeEventEnum)wparam}";
+                // 是否应该加上通用的变更记录日志
+                bool shouldCommonLog = true;
 
-                Log(DeviceChangeListenerTextBlock, $"[WM_DEVICECHANGE]设备发生插拔 0x{wparam.ToString("X4")}-0x{lparam.ToString("X4")};{eventText}", true);
-                LogDevices();
+                bool isDeviceArrival = (int)wparam == (int)WindowsMessageDeviceChangeEventEnum.DBT_DEVICEARRIVAL;
+                bool isDeviceRemoveComplete = (int)wparam == (int)WindowsMessageDeviceChangeEventEnum.DBT_DEVICEREMOVECOMPLETE;
+
+                if (isDeviceArrival || isDeviceRemoveComplete)
+                {
+                    // 设备被移除或插入，试试拿到具体是哪个设备
+                    DEV_BROADCAST_HDR hdr =
+                        (DEV_BROADCAST_HDR) Marshal.PtrToStructure(lparam, typeof(DEV_BROADCAST_HDR));
+                    if (hdr.dbch_devicetype == UsbNotification.DbtDevtypDeviceinterface)
+                    {
+                        DEV_BROADCAST_DEVICEINTERFACE deviceInterface =
+                            (DEV_BROADCAST_DEVICEINTERFACE) Marshal.PtrToStructure(lparam,
+                                typeof(DEV_BROADCAST_DEVICEINTERFACE));
+
+                        var classguid = deviceInterface.dbcc_classguid;
+                        // 这里的 classguid 默认会带上 name 上，于是就用不着
+
+                        var size = Marshal.SizeOf(typeof(DEV_BROADCAST_DEVICEINTERFACE));
+                        var namePtr = lparam + size;
+                        var nameSize = hdr.dbch_size - size;
+                        // 使用 Unicode 读取的话，一个字符是两个字节
+                        var charLength = nameSize / 2;
+                        var name = Marshal.PtrToStringUni(namePtr, charLength);
+                        if (string.IsNullOrEmpty(name))
+                        {
+                            name = "读取不到设备名";
+                        }
+
+                        string pid = string.Empty;
+                        string vid = string.Empty;
+
+                        var pidMatch = Regex.Match(name, @"PID_([\dA-Fa-f]{4})");
+                        if (pidMatch.Success)
+                        {
+                            pid = pidMatch.Groups[1].Value;
+                        }
+
+                        var vidMatch = Regex.Match(name, @"VID_([\dA-Fa-f]{4})");
+                        if (vidMatch.Success)
+                        {
+                            vid = vidMatch.Groups[1].Value;
+                        }
+
+                        Log(DeviceChangeListenerTextBlock, $"[WM_DEVICECHANGE] 设备{(isDeviceArrival?"插入":"拔出")} PID={pid} VID={vid}\r\n{name}", true);
+
+                        // 换成带上更多信息的记录，不需要通用记录
+                        shouldCommonLog = false;
+                    }
+                }
+
+                if (shouldCommonLog)
+                {
+                    var eventText = $"Event={(WindowsMessageDeviceChangeEventEnum) wparam}";
+
+                    Log(DeviceChangeListenerTextBlock,
+                        $"[WM_DEVICECHANGE]设备发生插拔 Param=0x{wparam.ToString("X4")}-0x{lparam.ToString("X4")};{eventText}",
+                        true);
+                    LogDevices();
+                }
             }
-            else if (msg == (int) WindowMessages.TABLET_ADDED)
+            else if (msg == (int)WindowMessages.TABLET_ADDED)
             {
-                Log(DeviceChangeListenerTextBlock, $"[TABLET_ADDED]触摸设备插入 0x{wparam.ToString("X4")} - 0x{lparam.ToString("X4")}", true);
+                Log(DeviceChangeListenerTextBlock,
+                    $"[TABLET_ADDED]触摸设备插入 0x{wparam.ToString("X4")} - 0x{lparam.ToString("X4")}", true);
             }
-            else if (msg == (int) WindowMessages.TABLET_DELETED)
+            else if (msg == (int)WindowMessages.TABLET_DELETED)
             {
-                Log(DeviceChangeListenerTextBlock, $"[TABLET_DELETED]触摸设备拔出 0x{wparam.ToString("X4")} - 0x{lparam.ToString("X4")}", true);
+                Log(DeviceChangeListenerTextBlock,
+                    $"[TABLET_DELETED]触摸设备拔出 0x{wparam.ToString("X4")} - 0x{lparam.ToString("X4")}", true);
             }
 
             // 输出消息。
@@ -262,7 +362,7 @@ namespace ManipulationDemo
                 return IntPtr.Zero;
             }
 
-            var formattedMessage = $"{(WindowMessages) msg}({msg})";
+            var formattedMessage = $"{(WindowMessages)msg}({msg})";
             Log(HwndMsgTextBlock, formattedMessage);
 
             return IntPtr.Zero;
