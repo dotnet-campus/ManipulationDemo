@@ -229,7 +229,7 @@ namespace ManipulationDemo
             }
         }
 
-        private bool ShowTouchAreaInTouch { get; } = true;
+        private bool ShowTouchAreaInTouch { get; } = false;
 
         private void OnStylusDown(object sender, StylusDownEventArgs e)
         {
