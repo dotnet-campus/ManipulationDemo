@@ -32,6 +32,8 @@ namespace ManipulationDemo
         public MainWindow()
         {
             InitializeComponent();
+            _touchAreaProvider = new TouchAreaProvider(RootGrid);
+            
             this.RemoveIcon();
 
             var args = Environment.GetCommandLineArgs();
@@ -51,10 +53,32 @@ namespace ManipulationDemo
 
             AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
 
+            MonitorWithWMI();
+        }
+
+        private async void MonitorWithWMI()
+        {
+            // 比如等待触摸启动之后，才能开启 WMI 监听。否则将会在 dotnet core 下抛出异常
+            // 猜测是因为 .NET Core 下的触摸 COM 组件在相同进程内，被 WMI 注册所干扰，导致找不到注册接口
+            /*
+            System.InvalidCastException: 没有注册接口
+            HResult	0x80004002
+
+               在 MS.Win32.Penimc.UnsafeNativeMethods.CoCreateInstance(Guid& clsid, Object punkOuter, Int32 context, Guid& iid)
+ 	           PresentationCore.dll!MS.Win32.Penimc.UnsafeNativeMethods.CreatePimcManager()	未知
+               PresentationCore.dll!MS.Win32.Penimc.UnsafeNativeMethods.PimcManager.get()	未知
+               PresentationCore.dll!System.Windows.Input.PenThreadWorker.WorkerOperationGetTabletsInfo.OnDoWork()	未知
+               PresentationCore.dll!System.Windows.Input.PenThreadWorker.WorkerOperation.DoWork()	未知
+               PresentationCore.dll!System.Windows.Input.PenThreadWorker.ThreadProc()	未知
+               System.Private.CoreLib.dll!System.Threading.Thread.StartHelper.Callback(object state)	未知
+               System.Private.CoreLib.dll!System.Threading.ExecutionContext.RunInternal(System.Threading.ExecutionContext executionContext, System.Threading.ContextCallback callback, object state)	未知
+               System.Private.CoreLib.dll!System.Threading.Thread.StartCallback()	未知
+             */
+            await Task.Delay(1000);
+
             try
             {
                 WqlEventQuery insertQuery = new WqlEventQuery("SELECT * FROM __InstanceCreationEvent WITHIN 2 WHERE TargetInstance ISA 'Win32_USBHub'");
-
                 ManagementEventWatcher insertWatcher = new ManagementEventWatcher(insertQuery);
                 insertWatcher.EventArrived += (s, e) =>
                 {
@@ -72,7 +96,7 @@ namespace ManipulationDemo
                     Log($"{DateTime.Now} {str.ToString()} {Environment.NewLine}");
                 };
                 insertWatcher.Start();
-
+                
                 WqlEventQuery removeQuery = new WqlEventQuery("SELECT * FROM __InstanceDeletionEvent WITHIN 2 WHERE TargetInstance ISA 'Win32_USBHub'");
                 ManagementEventWatcher removeWatcher = new ManagementEventWatcher(removeQuery);
                 removeWatcher.EventArrived += (s, e) =>
@@ -96,8 +120,6 @@ namespace ManipulationDemo
             {
                 // 忽略
             }
-
-            _touchAreaProvider = new TouchAreaProvider(RootGrid);
         }
 
         private readonly TouchAreaProvider _touchAreaProvider;
