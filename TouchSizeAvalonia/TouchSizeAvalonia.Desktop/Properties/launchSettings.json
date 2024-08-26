@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "TouchSizeAvalonia.Desktop": {
+      "commandName": "Project"
+    },
+    "配置文件 1": {
+      "commandName": "Executable",
+      "executablePath": "c:\\lindexi\\SyncFile_Serve\\File\\win\\TouchSizeAvalonia.Desktop.exe"
+    }
+  }
+}
