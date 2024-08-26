@@ -14,7 +14,7 @@
             </Style.Triggers>
         </Style>
     </Window.Style>
-    <Grid>
+    <Grid x:Name="RootGrid">
         <InkCanvas x:Name="DrawingArea" 
                    PreviewStylusDown="OnStylusDown"
                    PreviewStylusMove="OnStylusMove"

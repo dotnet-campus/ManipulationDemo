@@ -19,6 +19,8 @@ using Windows.Win32;
 using static ManipulationDemo.UsbNotification;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Windows.Media.Media3D;
+using System.Windows.Media;
 
 namespace ManipulationDemo
 {
@@ -200,20 +202,163 @@ namespace ManipulationDemo
                 // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getpointerdevices
             }
         }
+        private readonly Dictionary<int /*Id*/, PointInfo> _dictionary = [];
 
         private void OnStylusDown(object sender, StylusDownEventArgs e)
         {
             StylusDownStoryboard.Begin();
+
+            var stylusPointCollection = e.GetStylusPoints(null);
+            var position = stylusPointCollection[0];
+            (bool success, double width, double height) = GetSize(position);
+
+            Border border = new Border
+            {
+                Background =  new SolidColorBrush(Colors.Gray)
+                {
+                    Opacity = 0.5
+                },
+                Width = Math.Max(5, width),
+                Height = Math.Max(5, height),
+                IsHitTestVisible = false,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                RenderTransform = new TranslateTransform(position.X, position.Y),
+            };
+            RootGrid.Children.Add(border);
+
+            var textBlock = new TextBlock()
+            {
+                IsHitTestVisible = false,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                TextWrapping = TextWrapping.Wrap,
+                RenderTransform = new TranslateTransform(position.X, position.Y),
+            };
+            RootGrid.Children.Add(textBlock);
+
+            _dictionary[e.StylusDevice.Id] = new PointInfo(position.X, position.Y, width, height, border, textBlock);
         }
 
         private void OnStylusMove(object sender, StylusEventArgs e)
         {
             StylusMoveStoryboard.Begin();
+
+            if (_dictionary.TryGetValue(e.StylusDevice.Id, out var info))
+            {
+                var stylusPointCollection = e.GetStylusPoints(null);
+                var position = stylusPointCollection[0];
+                (bool success, double width, double height) = GetSize(position);
+#nullable enable
+                string? errorMessage = null;
+                if (success)
+                {
+                    if (double.IsNaN(width))
+                    {
+                        errorMessage += "Origin width is NaN\r\n";
+                    }
+                    if (double.IsNaN(height))
+                    {
+                        errorMessage += "Origin height is NaN\r\n";
+                    }
+                }
+
+                var viewWidth = width;
+                var viewHeight = height;
+
+                if (width <= 0.01)
+                {
+                    width = info.Width;
+                    viewWidth = width;
+                }
+
+                if (height <= 0.01)
+                {
+                    height = info.Height;
+                    viewHeight = height;
+                }
+
+                viewWidth = Math.Max(5, viewWidth);
+                viewHeight = Math.Max(5, viewHeight);
+
+                var borderRenderTransform = (TranslateTransform) info.Border.RenderTransform!;
+                borderRenderTransform.X = position.X - viewWidth / 2;
+                borderRenderTransform.Y = position.Y - viewHeight / 2;
+
+                var textBlock = info.TextBlock;
+                textBlock.Text = $"Id:{e.StylusDevice.Id}\r\nX: {position.X}, Y: {position.Y}\r\nWidth: {width:F2}, Height: {height:F2}\r\n{errorMessage}";
+
+                var textBlockRenderTransform = (TranslateTransform) textBlock.RenderTransform!;
+                textBlockRenderTransform.X = position.X;
+                textBlockRenderTransform.Y = position.Y;
+
+                _dictionary[e.StylusDevice.Id] = info with
+                {
+                    X = position.X,
+                    Y = position.Y,
+
+                    Width = width,
+                    Height = height
+                };
+#nullable restore
+            }
         }
 
-        private void OnStylusUp(object sender, StylusEventArgs e)
+        private async void OnStylusUp(object sender, StylusEventArgs e)
         {
             StylusUpStoryboard.Begin();
+
+            if (_dictionary.TryGetValue(e.StylusDevice.Id, out var info))
+            {
+                RootGrid.Children.Remove(info.Border);
+
+                info.TextBlock.Text = "IsUp=true\r\n" + info.TextBlock.Text;
+                info.TextBlock.Opacity = 0.9;
+
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                info.TextBlock.Foreground = Brushes.Black;
+                info.TextBlock.Opacity = 0.5;
+                for (int i = 0; i < 5; i++)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    info.TextBlock.Opacity = (5 - i) * 0.1;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1));
+                RootGrid.Children.Remove(info.TextBlock);
+            }
+        }
+
+        private (bool Success, double Width, double Height) GetSize(StylusPoint stylusPoint)
+        {
+            // 先写固定一个值，后面再改成动态的
+            var screenWidth = 1920;
+            var screenHeight = 1080;
+
+            bool success = false;
+            var width = 0d;
+            if (stylusPoint.Description.HasProperty(StylusPointProperties.Width))
+            {
+                var propertyValue = stylusPoint.GetPropertyValue(StylusPointProperties.Width);
+                var widthProperty = stylusPoint.Description.GetPropertyInfo(StylusPointProperties.Width);
+
+                width = propertyValue / (double) widthProperty.Maximum * screenWidth;
+
+                success = true;
+            }
+
+            var height = 0d;
+            if (stylusPoint.Description.HasProperty(StylusPointProperties.Height))
+            {
+                var propertyValue = stylusPoint.GetPropertyValue(StylusPointProperties.Height);
+                var heightProperty = stylusPoint.Description.GetPropertyInfo(StylusPointProperties.Height);
+
+                height = propertyValue / (double) heightProperty.Maximum * screenHeight;
+
+                success = true;
+            }
+
+            return (success, width, height);
         }
 
         private void OnTouchDown(object sender, TouchEventArgs e)
@@ -280,13 +425,13 @@ namespace ManipulationDemo
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam, ref bool handled)
         {
             // 检查硬件设备插拔。
-            if (msg == (int)WindowMessages.DEVICECHANGE)
+            if (msg == (int) WindowMessages.DEVICECHANGE)
             {
                 // 是否应该加上通用的变更记录日志
                 bool shouldCommonLog = true;
 
-                bool isDeviceArrival = (int)wparam == (int)WindowsMessageDeviceChangeEventEnum.DBT_DEVICEARRIVAL;
-                bool isDeviceRemoveComplete = (int)wparam == (int)WindowsMessageDeviceChangeEventEnum.DBT_DEVICEREMOVECOMPLETE;
+                bool isDeviceArrival = (int) wparam == (int) WindowsMessageDeviceChangeEventEnum.DBT_DEVICEARRIVAL;
+                bool isDeviceRemoveComplete = (int) wparam == (int) WindowsMessageDeviceChangeEventEnum.DBT_DEVICEREMOVECOMPLETE;
 
                 if (isDeviceArrival || isDeviceRemoveComplete)
                 {
@@ -328,7 +473,7 @@ namespace ManipulationDemo
                             vid = vidMatch.Groups[1].Value;
                         }
 
-                        Log(DeviceChangeListenerTextBlock, $"[WM_DEVICECHANGE] 设备{(isDeviceArrival?"插入":"拔出")} PID={pid} VID={vid}\r\n{name}", true);
+                        Log(DeviceChangeListenerTextBlock, $"[WM_DEVICECHANGE] 设备{(isDeviceArrival ? "插入" : "拔出")} PID={pid} VID={vid}\r\n{name}", true);
 
                         // 换成带上更多信息的记录，不需要通用记录
                         shouldCommonLog = false;
@@ -345,12 +490,12 @@ namespace ManipulationDemo
                     LogDevices();
                 }
             }
-            else if (msg == (int)WindowMessages.TABLET_ADDED)
+            else if (msg == (int) WindowMessages.TABLET_ADDED)
             {
                 Log(DeviceChangeListenerTextBlock,
                     $"[TABLET_ADDED]触摸设备插入 0x{wparam.ToString("X4")} - 0x{lparam.ToString("X4")}", true);
             }
-            else if (msg == (int)WindowMessages.TABLET_DELETED)
+            else if (msg == (int) WindowMessages.TABLET_DELETED)
             {
                 Log(DeviceChangeListenerTextBlock,
                     $"[TABLET_DELETED]触摸设备拔出 0x{wparam.ToString("X4")} - 0x{lparam.ToString("X4")}", true);
@@ -362,7 +507,7 @@ namespace ManipulationDemo
                 return IntPtr.Zero;
             }
 
-            var formattedMessage = $"{(WindowMessages)msg}({msg})";
+            var formattedMessage = $"{(WindowMessages) msg}({msg})";
             Log(HwndMsgTextBlock, formattedMessage);
 
             return IntPtr.Zero;
@@ -483,4 +628,25 @@ namespace ManipulationDemo
         DBT_CUSTOMEVENT = 0x8006,
         DBT_USERDEFINED = 0xFFFF,
     }
+
+    struct PointInfo
+    {
+        public PointInfo(double x, double y, double width, double height, Border border, TextBlock textBlock)
+        {
+            X = x;
+            Y = y;
+            Width = width;
+            Height = height;
+            Border = border;
+            TextBlock = textBlock;
+        }
+
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public Border Border { get; }
+        public TextBlock TextBlock { get; }
+    }
+
 }
