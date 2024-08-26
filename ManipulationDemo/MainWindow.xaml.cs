@@ -248,6 +248,7 @@ namespace ManipulationDemo
             var position = stylusPointCollection[0];
             (bool success, double width, double height) = GetSize(position);
 
+#nullable enable
             string? errorMessage = null;
             if (success)
             {
@@ -262,6 +263,7 @@ namespace ManipulationDemo
             }
 
             _touchAreaProvider.Move(e.StylusDevice.Id, position.ToPoint(), new Size(width, height), errorMessage);
+#nullable restore
         }
 
         private async void OnStylusUp(object sender, StylusEventArgs e)

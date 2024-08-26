@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -54,7 +55,6 @@ class TouchAreaProvider
         var (width, height) = (size.Width, size.Height);
         if (_dictionary.TryGetValue(id, out var info))
         {
-#nullable enable
             var viewWidth = width;
             var viewHeight = height;
 
@@ -93,7 +93,6 @@ class TouchAreaProvider
                 Width = width,
                 Height = height
             };
-#nullable restore
         }
     }
 
