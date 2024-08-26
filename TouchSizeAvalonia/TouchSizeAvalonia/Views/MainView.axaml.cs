@@ -103,10 +103,7 @@ public partial class MainView : UserControl
             borderRenderTransform.Y = position.Y - viewHeight / 2;
 
             var textBlock = info.TextBlock;
-            var message = $"Id:{e.Pointer.Id}\r\nX: {position.X}, Y: {position.Y}\r\nWidth: {width:F2}, Height: {height:F2}\r\n{errorMessage}";
-            textBlock.Text = message;
-
-            Console.WriteLine(message);
+            textBlock.Text = $"Id:{e.Pointer.Id}\r\nX: {position.X}, Y: {position.Y}\r\nWidth: {width:F2}, Height: {height:F2}\r\n{errorMessage}";
 
             var textBlockRenderTransform = (TranslateTransform) textBlock.RenderTransform!;
             textBlockRenderTransform.X = position.X;
@@ -183,7 +180,7 @@ public partial class MainView : UserControl
         {
             dynamic d = currentPoint.Properties;
             Rect contactRect = d.ContactRect;
-            Console.WriteLine($"ContactRect={contactRect}");
+
             return (Success: true, contactRect.Width, contactRect.Height);
         }
         catch
