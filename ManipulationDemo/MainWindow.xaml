@@ -14,8 +14,20 @@
             </Style.Triggers>
         </Style>
     </Window.Style>
-    <Grid x:Name="RootGrid">
-        <InkCanvas x:Name="DrawingArea" 
+    <Grid x:Name="RootGrid" Background="Transparent"
+          PreviewStylusDown="OnStylusDown"
+          PreviewStylusMove="OnStylusMove"
+          PreviewStylusUp="OnStylusUp"
+          PreviewTouchDown="OnTouchDown"
+          PreviewTouchMove="OnTouchMove"
+          PreviewTouchUp="OnTouchUp"
+          PreviewMouseDown="OnMouseDown"
+          PreviewMouseMove="OnMouseMove"
+          PreviewMouseUp="OnMouseUp"
+          ManipulationStarting="OnManipulationStarting"
+          ManipulationDelta="OnManipulationDelta"
+          ManipulationCompleted="OnManipulationCompleted">
+        <!--<InkCanvas x:Name="DrawingArea" 
                    PreviewStylusDown="OnStylusDown"
                    PreviewStylusMove="OnStylusMove"
                    PreviewStylusUp="OnStylusUp"
@@ -27,7 +39,7 @@
                    PreviewMouseUp="OnMouseUp"
                    ManipulationStarting="OnManipulationStarting"
                    ManipulationDelta="OnManipulationDelta"
-                   ManipulationCompleted="OnManipulationCompleted"/>
+                   ManipulationCompleted="OnManipulationCompleted"/>-->
         <UniformGrid x:Name="IndicatorPanel" VerticalAlignment="Top" Columns="3" IsHitTestVisible="False">
             <FrameworkElement.Resources>
                 <Style TargetType="Border">
@@ -171,6 +183,6 @@
         </TextBlock>
         <CheckBox HorizontalAlignment="Left" VerticalAlignment="Bottom"
                   Margin="8" Content="IsManipulationEnabled"
-                  IsChecked="{Binding IsManipulationEnabled, ElementName=DrawingArea, Mode=TwoWay}"/>
+                  IsChecked="{Binding IsManipulationEnabled, ElementName=RootGrid, Mode=TwoWay}"/>
     </Grid>
 </Window>
