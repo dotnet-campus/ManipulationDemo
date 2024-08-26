@@ -33,7 +33,7 @@ namespace ManipulationDemo
         {
             InitializeComponent();
             _touchAreaProvider = new TouchAreaProvider(RootGrid);
-            
+
             this.RemoveIcon();
 
             var args = Environment.GetCommandLineArgs();
@@ -96,7 +96,7 @@ namespace ManipulationDemo
                     Log($"{DateTime.Now} {str.ToString()} {Environment.NewLine}");
                 };
                 insertWatcher.Start();
-                
+
                 WqlEventQuery removeQuery = new WqlEventQuery("SELECT * FROM __InstanceDeletionEvent WITHIN 2 WHERE TargetInstance ISA 'Win32_USBHub'");
                 ManagementEventWatcher removeWatcher = new ManagementEventWatcher(removeQuery);
                 removeWatcher.EventArrived += (s, e) =>
@@ -229,6 +229,8 @@ namespace ManipulationDemo
             }
         }
 
+        private bool ShowTouchAreaInTouch { get; } = true;
+
         private void OnStylusDown(object sender, StylusDownEventArgs e)
         {
             StylusDownStoryboard.Begin();
@@ -237,7 +239,10 @@ namespace ManipulationDemo
             var position = stylusPointCollection[0];
             (bool success, double width, double height) = GetSize(position);
 
-            _touchAreaProvider.Down(e.StylusDevice.Id, position.ToPoint(), new Size(width, height));
+            if (!ShowTouchAreaInTouch || e.StylusDevice.TabletDevice.Type != TabletDeviceType.Touch)
+            {
+                _touchAreaProvider.Down(e.StylusDevice.Id, position.ToPoint(), new Size(width, height));
+            }
         }
 
         private void OnStylusMove(object sender, StylusEventArgs e)
@@ -262,15 +267,21 @@ namespace ManipulationDemo
                 }
             }
 
-            _touchAreaProvider.Move(e.StylusDevice.Id, position.ToPoint(), new Size(width, height), errorMessage);
+            if (!ShowTouchAreaInTouch || e.StylusDevice.TabletDevice.Type != TabletDeviceType.Touch)
+            {
+                _touchAreaProvider.Move(e.StylusDevice.Id, position.ToPoint(), new Size(width, height), errorMessage);
+            }
 #nullable restore
         }
 
-        private async void OnStylusUp(object sender, StylusEventArgs e)
+        private void OnStylusUp(object sender, StylusEventArgs e)
         {
             StylusUpStoryboard.Begin();
 
-            _touchAreaProvider.Up(e.StylusDevice.Id);
+            if (!ShowTouchAreaInTouch || e.StylusDevice.TabletDevice.Type != TabletDeviceType.Touch)
+            {
+                _touchAreaProvider.Up(e.StylusDevice.Id);
+            }
         }
 
         private (bool Success, double Width, double Height) GetSize(StylusPoint stylusPoint)
@@ -308,17 +319,31 @@ namespace ManipulationDemo
         private void OnTouchDown(object sender, TouchEventArgs e)
         {
             TouchDownStoryboard.Begin();
+
+            var touchPoint = e.GetTouchPoint(this);
+            if (ShowTouchAreaInTouch)
+            {
+                _touchAreaProvider.Down(e.TouchDevice.Id, touchPoint.Position, touchPoint.Size);
+            }
         }
 
         private void OnTouchMove(object sender, TouchEventArgs e)
         {
             TouchMoveStoryboard.Begin();
-
+            var touchPoint = e.GetTouchPoint(this);
+            if (ShowTouchAreaInTouch)
+            {
+                _touchAreaProvider.Move(e.TouchDevice.Id, touchPoint.Position, touchPoint.Size, null);
+            }
         }
 
         private void OnTouchUp(object sender, TouchEventArgs e)
         {
             TouchUpStoryboard.Begin();
+            if (ShowTouchAreaInTouch)
+            {
+                _touchAreaProvider.Up(e.TouchDevice.Id);
+            }
         }
 
         private void OnMouseDown(object sender, MouseButtonEventArgs e)
