@@ -32,6 +32,8 @@ namespace ManipulationDemo
         public MainWindow()
         {
             InitializeComponent();
+            _touchAreaProvider = new TouchAreaProvider(RootGrid);
+
             this.RemoveIcon();
 
             var args = Environment.GetCommandLineArgs();
@@ -51,10 +53,32 @@ namespace ManipulationDemo
 
             AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
 
+            MonitorWithWMI();
+        }
+
+        private async void MonitorWithWMI()
+        {
+            // 比如等待触摸启动之后，才能开启 WMI 监听。否则将会在 dotnet core 下抛出异常
+            // 猜测是因为 .NET Core 下的触摸 COM 组件在相同进程内，被 WMI 注册所干扰，导致找不到注册接口
+            /*
+            System.InvalidCastException: 没有注册接口
+            HResult	0x80004002
+
+               在 MS.Win32.Penimc.UnsafeNativeMethods.CoCreateInstance(Guid& clsid, Object punkOuter, Int32 context, Guid& iid)
+ 	           PresentationCore.dll!MS.Win32.Penimc.UnsafeNativeMethods.CreatePimcManager()	未知
+               PresentationCore.dll!MS.Win32.Penimc.UnsafeNativeMethods.PimcManager.get()	未知
+               PresentationCore.dll!System.Windows.Input.PenThreadWorker.WorkerOperationGetTabletsInfo.OnDoWork()	未知
+               PresentationCore.dll!System.Windows.Input.PenThreadWorker.WorkerOperation.DoWork()	未知
+               PresentationCore.dll!System.Windows.Input.PenThreadWorker.ThreadProc()	未知
+               System.Private.CoreLib.dll!System.Threading.Thread.StartHelper.Callback(object state)	未知
+               System.Private.CoreLib.dll!System.Threading.ExecutionContext.RunInternal(System.Threading.ExecutionContext executionContext, System.Threading.ContextCallback callback, object state)	未知
+               System.Private.CoreLib.dll!System.Threading.Thread.StartCallback()	未知
+             */
+            await Task.Delay(1000);
+
             try
             {
                 WqlEventQuery insertQuery = new WqlEventQuery("SELECT * FROM __InstanceCreationEvent WITHIN 2 WHERE TargetInstance ISA 'Win32_USBHub'");
-
                 ManagementEventWatcher insertWatcher = new ManagementEventWatcher(insertQuery);
                 insertWatcher.EventArrived += (s, e) =>
                 {
@@ -97,6 +121,8 @@ namespace ManipulationDemo
                 // 忽略
             }
         }
+
+        private readonly TouchAreaProvider _touchAreaProvider;
 
         private Storyboard StylusDownStoryboard => (Storyboard) IndicatorPanel.FindResource("Storyboard.StylusDown");
         private Storyboard StylusMoveStoryboard => (Storyboard) IndicatorPanel.FindResource("Storyboard.StylusMove");
@@ -202,7 +228,8 @@ namespace ManipulationDemo
                 // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getpointerdevices
             }
         }
-        private readonly Dictionary<int /*Id*/, PointInfo> _dictionary = [];
+
+        private bool ShowTouchAreaInTouch { get; } = false;
 
         private void OnStylusDown(object sender, StylusDownEventArgs e)
         {
@@ -212,120 +239,48 @@ namespace ManipulationDemo
             var position = stylusPointCollection[0];
             (bool success, double width, double height) = GetSize(position);
 
-            Border border = new Border
+            if (!ShowTouchAreaInTouch || e.StylusDevice.TabletDevice.Type != TabletDeviceType.Touch)
             {
-                Background =  new SolidColorBrush(Colors.Gray)
-                {
-                    Opacity = 0.5
-                },
-                Width = Math.Max(5, width),
-                Height = Math.Max(5, height),
-                IsHitTestVisible = false,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Top,
-                RenderTransform = new TranslateTransform(position.X, position.Y),
-            };
-            RootGrid.Children.Add(border);
-
-            var textBlock = new TextBlock()
-            {
-                IsHitTestVisible = false,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Top,
-                TextWrapping = TextWrapping.Wrap,
-                RenderTransform = new TranslateTransform(position.X, position.Y),
-            };
-            RootGrid.Children.Add(textBlock);
-
-            _dictionary[e.StylusDevice.Id] = new PointInfo(position.X, position.Y, width, height, border, textBlock);
+                _touchAreaProvider.Down(e.StylusDevice.Id, position.ToPoint(), new Size(width, height));
+            }
         }
 
         private void OnStylusMove(object sender, StylusEventArgs e)
         {
             StylusMoveStoryboard.Begin();
 
-            if (_dictionary.TryGetValue(e.StylusDevice.Id, out var info))
-            {
-                var stylusPointCollection = e.GetStylusPoints(null);
-                var position = stylusPointCollection[0];
-                (bool success, double width, double height) = GetSize(position);
+            var stylusPointCollection = e.GetStylusPoints(null);
+            var position = stylusPointCollection[0];
+            (bool success, double width, double height) = GetSize(position);
+
 #nullable enable
-                string? errorMessage = null;
-                if (success)
+            string? errorMessage = null;
+            if (success)
+            {
+                if (double.IsNaN(width))
                 {
-                    if (double.IsNaN(width))
-                    {
-                        errorMessage += "Origin width is NaN\r\n";
-                    }
-                    if (double.IsNaN(height))
-                    {
-                        errorMessage += "Origin height is NaN\r\n";
-                    }
+                    errorMessage += "Origin width is NaN\r\n";
                 }
-
-                var viewWidth = width;
-                var viewHeight = height;
-
-                if (width <= 0.01)
+                if (double.IsNaN(height))
                 {
-                    width = info.Width;
-                    viewWidth = width;
+                    errorMessage += "Origin height is NaN\r\n";
                 }
-
-                if (height <= 0.01)
-                {
-                    height = info.Height;
-                    viewHeight = height;
-                }
-
-                viewWidth = Math.Max(5, viewWidth);
-                viewHeight = Math.Max(5, viewHeight);
-
-                var borderRenderTransform = (TranslateTransform) info.Border.RenderTransform!;
-                borderRenderTransform.X = position.X - viewWidth / 2;
-                borderRenderTransform.Y = position.Y - viewHeight / 2;
-
-                var textBlock = info.TextBlock;
-                textBlock.Text = $"Id:{e.StylusDevice.Id}\r\nX: {position.X}, Y: {position.Y}\r\nWidth: {width:F2}, Height: {height:F2}\r\n{errorMessage}";
-
-                var textBlockRenderTransform = (TranslateTransform) textBlock.RenderTransform!;
-                textBlockRenderTransform.X = position.X;
-                textBlockRenderTransform.Y = position.Y;
-
-                _dictionary[e.StylusDevice.Id] = info with
-                {
-                    X = position.X,
-                    Y = position.Y,
-
-                    Width = width,
-                    Height = height
-                };
-#nullable restore
             }
+
+            if (!ShowTouchAreaInTouch || e.StylusDevice.TabletDevice.Type != TabletDeviceType.Touch)
+            {
+                _touchAreaProvider.Move(e.StylusDevice.Id, position.ToPoint(), new Size(width, height), errorMessage);
+            }
+#nullable restore
         }
 
-        private async void OnStylusUp(object sender, StylusEventArgs e)
+        private void OnStylusUp(object sender, StylusEventArgs e)
         {
             StylusUpStoryboard.Begin();
 
-            if (_dictionary.TryGetValue(e.StylusDevice.Id, out var info))
+            if (!ShowTouchAreaInTouch || e.StylusDevice.TabletDevice.Type != TabletDeviceType.Touch)
             {
-                RootGrid.Children.Remove(info.Border);
-
-                info.TextBlock.Text = "IsUp=true\r\n" + info.TextBlock.Text;
-                info.TextBlock.Opacity = 0.9;
-
-                await Task.Delay(TimeSpan.FromSeconds(5));
-                info.TextBlock.Foreground = Brushes.Black;
-                info.TextBlock.Opacity = 0.5;
-                for (int i = 0; i < 5; i++)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-                    info.TextBlock.Opacity = (5 - i) * 0.1;
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(1));
-                RootGrid.Children.Remove(info.TextBlock);
+                _touchAreaProvider.Up(e.StylusDevice.Id);
             }
         }
 
@@ -364,16 +319,31 @@ namespace ManipulationDemo
         private void OnTouchDown(object sender, TouchEventArgs e)
         {
             TouchDownStoryboard.Begin();
+
+            var touchPoint = e.GetTouchPoint(this);
+            if (ShowTouchAreaInTouch)
+            {
+                _touchAreaProvider.Down(e.TouchDevice.Id, touchPoint.Position, touchPoint.Size);
+            }
         }
 
         private void OnTouchMove(object sender, TouchEventArgs e)
         {
             TouchMoveStoryboard.Begin();
+            var touchPoint = e.GetTouchPoint(this);
+            if (ShowTouchAreaInTouch)
+            {
+                _touchAreaProvider.Move(e.TouchDevice.Id, touchPoint.Position, touchPoint.Size, null);
+            }
         }
 
         private void OnTouchUp(object sender, TouchEventArgs e)
         {
             TouchUpStoryboard.Begin();
+            if (ShowTouchAreaInTouch)
+            {
+                _touchAreaProvider.Up(e.TouchDevice.Id);
+            }
         }
 
         private void OnMouseDown(object sender, MouseButtonEventArgs e)
@@ -629,24 +599,5 @@ namespace ManipulationDemo
         DBT_USERDEFINED = 0xFFFF,
     }
 
-    struct PointInfo
-    {
-        public PointInfo(double x, double y, double width, double height, Border border, TextBlock textBlock)
-        {
-            X = x;
-            Y = y;
-            Width = width;
-            Height = height;
-            Border = border;
-            TextBlock = textBlock;
-        }
-
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
-        public Border Border { get; }
-        public TextBlock TextBlock { get; }
-    }
 
 }
