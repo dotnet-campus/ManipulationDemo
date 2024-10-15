@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Copy From: https://gitee.com/csharpui/CPF
+
+using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;

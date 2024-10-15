@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Copy From: https://gitee.com/csharpui/CPF
+
+using System;
 using System.Runtime.InteropServices;
 using Bool = System.Boolean;
 using Atom = System.IntPtr;

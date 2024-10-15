@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Copy From: https://gitee.com/csharpui/CPF
+
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Reflection;
