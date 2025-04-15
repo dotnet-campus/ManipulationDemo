@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 using CPF.Linux;
-
+using ManipulationDemoCpfX11.Utils;
 using SkiaSharp;
 
 using static CPF.Linux.XLib;
@@ -41,6 +41,29 @@ var xDisplayHeight = XDisplayHeight(display, screen);
 var width = xDisplayWidth;
 var height = xDisplayHeight;
 
+Console.WriteLine($"Display WH={width},{height}");
+
+int physicalWidth = -1;
+int physicalHeight = -1;
+
+if (OperatingSystem.IsLinux())
+{
+    var readEdidInfoResult = EdidInfo.ReadFormLinux();
+    if (readEdidInfoResult.IsSuccess)
+    {
+        var edidInfo = readEdidInfoResult.EdidInfo;
+        Console.WriteLine($"读取 Edid 成功，屏幕宽高：{edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value}cmx{edidInfo.BasicDisplayParameters.MonitorPhysicalHeight.Value}cm");
+
+        physicalWidth = (int)edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value;
+        physicalHeight = (int) edidInfo.BasicDisplayParameters.MonitorPhysicalHeight.Value;
+    }
+    else
+    {
+        Console.WriteLine($"读取 Edid 失败，错误原因：{readEdidInfoResult.ErrorMessage}");
+    }
+}
+
+
 var handle = XCreateWindow(display, rootWindow, 0, 0, width, height, 5,
     32,
     (int) CreateWindowArgs.InputOutput,
@@ -59,8 +82,6 @@ var skBitmap = new SKBitmap(width, height, SKColorType.Bgra8888, SKAlphaType.Pre
 var skCanvas = new SKCanvas(skBitmap);
 var xImage = CreateImage(skBitmap);
 
-Console.WriteLine($"WH={width},{height}");
-
 using var skPaint = new SKPaint();
 skPaint.Color = SKColors.Black;
 skPaint.StrokeWidth = 2;
@@ -72,7 +93,7 @@ var typeface = SKFontManager.Default.MatchCharacter('十');
 skPaint.TextSize = 20;
 skPaint.Typeface = typeface;
 skPaint.Color = SKColors.Black;
-skCanvas.Clear(SKColors.White);
+skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
 
 var touchMajorAtom = XInternAtom(display, "Abs MT Touch Major", false);
 var touchMinorAtom = XInternAtom(display, "Abs MT Touch Minor", false);
@@ -315,7 +336,7 @@ while (true)
 
 void Draw()
 {
-    skCanvas.Clear(SKColors.White);
+    skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
 
     foreach (var value in dictionary.Values)
     {
@@ -323,20 +344,35 @@ void Draw()
 
         if (touchMajorValuatorClassInfo != null)
         {
-            double pixelWidth = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max * xDisplayWidth;
+            var touchMajorScale = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max;
+            double pixelWidth = touchMajorScale * xDisplayWidth;
             double pixelHeight;
+            double physicalWidthValue = double.NaN;
+            double physicalHeightValue = double.NaN;
+
+            if (physicalWidth > 0)
+            {
+                physicalWidthValue = touchMajorScale * physicalWidth;
+            }
+
             if (touchMinorValuatorClassInfo is null)
             {
                 pixelHeight = pixelWidth;
             }
             else
             {
-                pixelHeight = value.TouchMinor / touchMinorValuatorClassInfo.Value.Max * xDisplayHeight;
+                var touchMinorScale = value.TouchMinor / touchMinorValuatorClassInfo.Value.Max;
+                pixelHeight = touchMinorScale * xDisplayHeight;
+
+                if (physicalHeight > 0)
+                {
+                    physicalHeightValue = touchMinorScale * physicalHeight;
+                }
             }
 
             skCanvas.DrawRect((float) (value.X - pixelWidth / 2), (float) (value.Y - pixelHeight / 2), (float) pixelWidth, (float) pixelHeight, skPaint);
 
-            logMessage += $" PixelW={pixelWidth} PixelH={pixelHeight} MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max}";
+            logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max}";
         }
 
         skPaint.IsLinearText = false;
