@@ -350,7 +350,7 @@ void Draw()
 
         skCanvas.DrawText(text, (float) value.X, (float) value.Y, skPaint);
 
-        //Log(logMessage);
+        Log(logMessage);
     }
 
     if (isSendExposeEvent)
