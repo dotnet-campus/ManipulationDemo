@@ -77,8 +77,9 @@ skCanvas.Clear(SKColors.White);
 var touchMajorAtom = XInternAtom(display, "Abs MT Touch Major", false);
 var touchMinorAtom = XInternAtom(display, "Abs MT Touch Minor", false);
 var pressureAtom = XInternAtom(display, "Abs MT Pressure", false);
+var orientationAtom = XInternAtom(display, "Abs MT Orientation",false);
 
-Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(display, pressureAtom)}");
+Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(display, pressureAtom)} Abs_MT_Orientation={orientationAtom} Name={XLib.GetAtomName(display, orientationAtom)}");
 
 var valuators = new List<XIValuatorClassInfo>();
 var scrollers = new List<XIScrollClassInfo>();
@@ -86,6 +87,7 @@ var scrollers = new List<XIScrollClassInfo>();
 XIValuatorClassInfo? touchMajorValuatorClassInfo = null;
 XIValuatorClassInfo? touchMinorValuatorClassInfo = null;
 XIValuatorClassInfo? pressureValuatorClassInfo = null;
+XIValuatorClassInfo? orientationValuatorClassInfo = null;
 
 unsafe
 {
@@ -154,6 +156,11 @@ unsafe
                 Console.WriteLine($"PressureAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
 
                 pressureValuatorClassInfo = xiValuatorClassInfo;
+            }
+            else if (xiValuatorClassInfo.Label == orientationAtom)
+            {
+                Console.WriteLine($"OrientationAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
+                orientationValuatorClassInfo = xiValuatorClassInfo;
             }
             else
             {
@@ -270,6 +277,15 @@ while (true)
 
                                 }
                             }
+
+                            if (orientationValuatorClassInfo.HasValue)
+                            {
+                                if (valuatorDictionary.TryGetValue(orientationValuatorClassInfo.Value.Number,out var value))
+                                {
+                                    Log($"Abs MT Orientation Value={value} Min={orientationValuatorClassInfo.Value.Min} Max={orientationValuatorClassInfo.Value.Max} Resolution={orientationValuatorClassInfo.Value.Resolution}");
+                                }
+                            }
+
                             dictionary[xiDeviceEvent->detail] = t;
                         }
                     }
