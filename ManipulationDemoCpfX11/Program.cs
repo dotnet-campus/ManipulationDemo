@@ -41,6 +41,9 @@ var xDisplayHeight = XDisplayHeight(display, screen);
 var width = xDisplayWidth;
 var height = xDisplayHeight;
 
+// 忽略 0 宽度高度
+bool ignoreZeroWidthHeight = true;
+
 Console.WriteLine($"Display WH={width},{height}");
 
 int physicalWidth = -1;
@@ -271,7 +274,7 @@ while (true)
 
                             if (touchMajorValuatorClassInfo.HasValue)
                             {
-                                if (valuatorDictionary.TryGetValue(touchMajorValuatorClassInfo.Value.Number, out var value))
+                                if (valuatorDictionary.TryGetValue(touchMajorValuatorClassInfo.Value.Number, out var value) && (!ignoreZeroWidthHeight || value != 0))
                                 {
                                     t = t with
                                     {
@@ -286,7 +289,7 @@ while (true)
 
                             if (touchMinorValuatorClassInfo.HasValue)
                             {
-                                if (valuatorDictionary.TryGetValue(touchMinorValuatorClassInfo.Value.Number, out var value))
+                                if (valuatorDictionary.TryGetValue(touchMinorValuatorClassInfo.Value.Number, out var value) && (!ignoreZeroWidthHeight || value != 0))
                                 {
                                     t = t with
                                     {
