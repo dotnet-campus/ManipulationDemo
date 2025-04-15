@@ -216,7 +216,7 @@ while (true)
                     var y = xiDeviceEvent->event_y;
                     if (xiEvent->evtype == XiEventType.XI_TouchBegin)
                     {
-                        dictionary[xiDeviceEvent->detail] = new TouchInfo(xiDeviceEvent->detail, x, y, -1, -1, false);
+                        dictionary[xiDeviceEvent->detail] = new TouchInfo(xiDeviceEvent->detail, x, y, -1, -1, TouchStatus.Down);
                     }
                     else if (xiEvent->evtype == XiEventType.XI_TouchUpdate)
                     {
@@ -226,6 +226,7 @@ while (true)
                             {
                                 X = x,
                                 Y = y,
+                                TouchStatus = TouchStatus.Move,
                             };
 
                             valuatorDictionary.Clear();
@@ -280,7 +281,7 @@ while (true)
                             {
                                 X = x,
                                 Y = y,
-                                IsUp = true,
+                                TouchStatus = TouchStatus.Up,
                             };
                         }
                     }
@@ -302,6 +303,8 @@ void Draw()
 
     foreach (var value in dictionary.Values)
     {
+        string logMessage = $"Id={value.Id};X={value.X} Y={value.Y};TouchMajor={value.TouchMajor} TouchMinor={value.TouchMinor}";
+
         if (touchMajorValuatorClassInfo != null)
         {
             double pixelWidth = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max * xDisplayWidth;
@@ -316,16 +319,22 @@ void Draw()
             }
 
             skCanvas.DrawRect((float) (value.X - pixelWidth / 2), (float) (value.Y - pixelHeight / 2), (float) pixelWidth, (float) pixelHeight, skPaint);
+
+            logMessage += $" PixelW={pixelWidth} PixelH={pixelHeight} MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max}";
         }
 
         skPaint.IsLinearText = false;
-        var text = $"""Id={value.Id};X={value.X} Y={value.Y};W={value.TouchMajor} H={value.TouchMinor}""";
-        if (value.IsUp)
+        var text = $"""
+                    Id={value.Id};X={value.X} Y={value.Y};W={value.TouchMajor} H={value.TouchMinor}
+                    """;
+        if (value.TouchStatus == TouchStatus.Up)
         {
             text = "[已抬起];" + text;
         }
 
         skCanvas.DrawText(text, (float) value.X, (float) value.Y, skPaint);
+
+        Log(logMessage);
     }
 
     if (isSendExposeEvent)
@@ -335,6 +344,13 @@ void Draw()
 
     SendExposeEvent(display, handle, 0, 0, width, height);
     isSendExposeEvent = true;
+}
+
+void Log(string message)
+{
+    Console.WriteLine(message);
+    var logFile = Path.Join(AppContext.BaseDirectory, $"Log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt");
+    File.AppendAllLines(logFile, [$"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] {message}"]);
 }
 
 
@@ -387,4 +403,13 @@ static void SendExposeEvent(IntPtr display, IntPtr window, int x, int y, int wid
     XFlush(display);
 }
 
-record TouchInfo(int Id, double X, double Y, double TouchMajor, double TouchMinor, bool IsUp);
+record TouchInfo(int Id, double X, double Y, double TouchMajor, double TouchMinor, TouchStatus TouchStatus)
+{
+}
+
+enum TouchStatus
+{
+    Down,
+    Move,
+    Up,
+}
