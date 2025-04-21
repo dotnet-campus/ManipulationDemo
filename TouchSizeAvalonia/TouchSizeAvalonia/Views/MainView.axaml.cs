@@ -178,7 +178,7 @@ public partial class MainView : UserControl
     {
         try
         {
-            dynamic d = currentPoint.Properties;
+            var d = currentPoint.Properties;
             Rect contactRect = d.ContactRect;
 
             return (Success: true, contactRect.Width, contactRect.Height);

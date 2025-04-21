@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 using CPF.Linux;
-
+using ManipulationDemoCpfX11.Utils;
 using SkiaSharp;
 
 using static CPF.Linux.XLib;
@@ -41,6 +41,32 @@ var xDisplayHeight = XDisplayHeight(display, screen);
 var width = xDisplayWidth;
 var height = xDisplayHeight;
 
+// 忽略 0 宽度高度
+bool ignoreZeroWidthHeight = true;
+
+Console.WriteLine($"Display WH={width},{height}");
+
+int physicalWidth = -1;
+int physicalHeight = -1;
+
+if (OperatingSystem.IsLinux())
+{
+    var readEdidInfoResult = EdidInfo.ReadFormLinux();
+    if (readEdidInfoResult.IsSuccess)
+    {
+        var edidInfo = readEdidInfoResult.EdidInfo;
+        Console.WriteLine($"读取 Edid 成功，屏幕宽高：{edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value}cmx{edidInfo.BasicDisplayParameters.MonitorPhysicalHeight.Value}cm");
+
+        physicalWidth = (int)edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value;
+        physicalHeight = (int) edidInfo.BasicDisplayParameters.MonitorPhysicalHeight.Value;
+    }
+    else
+    {
+        Console.WriteLine($"读取 Edid 失败，错误原因：{readEdidInfoResult.ErrorMessage}");
+    }
+}
+
+
 var handle = XCreateWindow(display, rootWindow, 0, 0, width, height, 5,
     32,
     (int) CreateWindowArgs.InputOutput,
@@ -59,8 +85,6 @@ var skBitmap = new SKBitmap(width, height, SKColorType.Bgra8888, SKAlphaType.Pre
 var skCanvas = new SKCanvas(skBitmap);
 var xImage = CreateImage(skBitmap);
 
-Console.WriteLine($"WH={width},{height}");
-
 using var skPaint = new SKPaint();
 skPaint.Color = SKColors.Black;
 skPaint.StrokeWidth = 2;
@@ -72,13 +96,14 @@ var typeface = SKFontManager.Default.MatchCharacter('十');
 skPaint.TextSize = 20;
 skPaint.Typeface = typeface;
 skPaint.Color = SKColors.Black;
-skCanvas.Clear(SKColors.White);
+skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
 
 var touchMajorAtom = XInternAtom(display, "Abs MT Touch Major", false);
 var touchMinorAtom = XInternAtom(display, "Abs MT Touch Minor", false);
 var pressureAtom = XInternAtom(display, "Abs MT Pressure", false);
+var orientationAtom = XInternAtom(display, "Abs MT Orientation",false);
 
-Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(display, pressureAtom)}");
+Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(display, pressureAtom)} Abs_MT_Orientation={orientationAtom} Name={XLib.GetAtomName(display, orientationAtom)}");
 
 var valuators = new List<XIValuatorClassInfo>();
 var scrollers = new List<XIScrollClassInfo>();
@@ -86,6 +111,7 @@ var scrollers = new List<XIScrollClassInfo>();
 XIValuatorClassInfo? touchMajorValuatorClassInfo = null;
 XIValuatorClassInfo? touchMinorValuatorClassInfo = null;
 XIValuatorClassInfo? pressureValuatorClassInfo = null;
+XIValuatorClassInfo? orientationValuatorClassInfo = null;
 
 unsafe
 {
@@ -155,6 +181,11 @@ unsafe
 
                 pressureValuatorClassInfo = xiValuatorClassInfo;
             }
+            else if (xiValuatorClassInfo.Label == orientationAtom)
+            {
+                Console.WriteLine($"OrientationAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
+                orientationValuatorClassInfo = xiValuatorClassInfo;
+            }
             else
             {
                 Console.WriteLine($"XiValuatorClassInfo Label={xiValuatorClassInfo.Label}({XLib.GetAtomName(display, xiValuatorClassInfo.Label)} Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution})");
@@ -216,7 +247,7 @@ while (true)
                     var y = xiDeviceEvent->event_y;
                     if (xiEvent->evtype == XiEventType.XI_TouchBegin)
                     {
-                        dictionary[xiDeviceEvent->detail] = new TouchInfo(xiDeviceEvent->detail, x, y, -1, -1, false);
+                        dictionary[xiDeviceEvent->detail] = new TouchInfo(xiDeviceEvent->detail, x, y, -1, -1, TouchStatus.Down);
                     }
                     else if (xiEvent->evtype == XiEventType.XI_TouchUpdate)
                     {
@@ -226,6 +257,7 @@ while (true)
                             {
                                 X = x,
                                 Y = y,
+                                TouchStatus = TouchStatus.Move,
                             };
 
                             valuatorDictionary.Clear();
@@ -242,7 +274,7 @@ while (true)
 
                             if (touchMajorValuatorClassInfo.HasValue)
                             {
-                                if (valuatorDictionary.TryGetValue(touchMajorValuatorClassInfo.Value.Number, out var value))
+                                if (valuatorDictionary.TryGetValue(touchMajorValuatorClassInfo.Value.Number, out var value) && (!ignoreZeroWidthHeight || value != 0))
                                 {
                                     t = t with
                                     {
@@ -257,7 +289,7 @@ while (true)
 
                             if (touchMinorValuatorClassInfo.HasValue)
                             {
-                                if (valuatorDictionary.TryGetValue(touchMinorValuatorClassInfo.Value.Number, out var value))
+                                if (valuatorDictionary.TryGetValue(touchMinorValuatorClassInfo.Value.Number, out var value) && (!ignoreZeroWidthHeight || value != 0))
                                 {
                                     t = t with
                                     {
@@ -269,6 +301,15 @@ while (true)
 
                                 }
                             }
+
+                            if (orientationValuatorClassInfo.HasValue)
+                            {
+                                if (valuatorDictionary.TryGetValue(orientationValuatorClassInfo.Value.Number,out var value))
+                                {
+                                    Log($"Abs MT Orientation Value={value} Min={orientationValuatorClassInfo.Value.Min} Max={orientationValuatorClassInfo.Value.Max} Resolution={orientationValuatorClassInfo.Value.Resolution}");
+                                }
+                            }
+
                             dictionary[xiDeviceEvent->detail] = t;
                         }
                     }
@@ -280,7 +321,7 @@ while (true)
                             {
                                 X = x,
                                 Y = y,
-                                IsUp = true,
+                                TouchStatus = TouchStatus.Up,
                             };
                         }
                     }
@@ -298,34 +339,57 @@ while (true)
 
 void Draw()
 {
-    skCanvas.Clear(SKColors.White);
+    skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
 
     foreach (var value in dictionary.Values)
     {
+        string logMessage = $"Id={value.Id};X={value.X} Y={value.Y};TouchMajor={value.TouchMajor} TouchMinor={value.TouchMinor}";
+
         if (touchMajorValuatorClassInfo != null)
         {
-            double pixelWidth = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max * xDisplayWidth;
+            var touchMajorScale = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max;
+            double pixelWidth = touchMajorScale * xDisplayWidth;
             double pixelHeight;
+            double physicalWidthValue = double.NaN;
+            double physicalHeightValue = double.NaN;
+
+            if (physicalWidth > 0)
+            {
+                physicalWidthValue = touchMajorScale * physicalWidth;
+            }
+
             if (touchMinorValuatorClassInfo is null)
             {
                 pixelHeight = pixelWidth;
             }
             else
             {
-                pixelHeight = value.TouchMinor / touchMinorValuatorClassInfo.Value.Max * xDisplayHeight;
+                var touchMinorScale = value.TouchMinor / touchMinorValuatorClassInfo.Value.Max;
+                pixelHeight = touchMinorScale * xDisplayHeight;
+
+                if (physicalHeight > 0)
+                {
+                    physicalHeightValue = touchMinorScale * physicalHeight;
+                }
             }
 
             skCanvas.DrawRect((float) (value.X - pixelWidth / 2), (float) (value.Y - pixelHeight / 2), (float) pixelWidth, (float) pixelHeight, skPaint);
+
+            logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max}";
         }
 
         skPaint.IsLinearText = false;
-        var text = $"""Id={value.Id};X={value.X} Y={value.Y};W={value.TouchMajor} H={value.TouchMinor}""";
-        if (value.IsUp)
+        var text = $"""
+                    Id={value.Id};X={value.X} Y={value.Y};W={value.TouchMajor} H={value.TouchMinor}
+                    """;
+        if (value.TouchStatus == TouchStatus.Up)
         {
             text = "[已抬起];" + text;
         }
 
         skCanvas.DrawText(text, (float) value.X, (float) value.Y, skPaint);
+
+        Log(logMessage);
     }
 
     if (isSendExposeEvent)
@@ -335,6 +399,13 @@ void Draw()
 
     SendExposeEvent(display, handle, 0, 0, width, height);
     isSendExposeEvent = true;
+}
+
+void Log(string message)
+{
+    Console.WriteLine(message);
+    var logFile = Path.Join(AppContext.BaseDirectory, $"Log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt");
+    File.AppendAllLines(logFile, [$"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] {message}"]);
 }
 
 
@@ -387,4 +458,13 @@ static void SendExposeEvent(IntPtr display, IntPtr window, int x, int y, int wid
     XFlush(display);
 }
 
-record TouchInfo(int Id, double X, double Y, double TouchMajor, double TouchMinor, bool IsUp);
+record TouchInfo(int Id, double X, double Y, double TouchMajor, double TouchMinor, TouchStatus TouchStatus)
+{
+}
+
+enum TouchStatus
+{
+    Down,
+    Move,
+    Up,
+}
