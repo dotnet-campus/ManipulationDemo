@@ -12,12 +12,9 @@
     <vm:MainViewModel />
   </Design.DataContext>
 
- <Grid x:Name="RootGrid" Background="Transparent">
-     <TextBlock x:Name="MessageTextBlock" Margin="10,10,10,10" IsHitTestVisible="False" TextWrapping="Wrap"></TextBlock>
-     <!--<Border x:Name="FooBorder" Background="Black" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top">
-         <Border.RenderTransform>
-             <TranslateTransform ></TranslateTransform>
-         </Border.RenderTransform>
-     </Border>-->
- </Grid>
+  <Grid x:Name="RootGrid" Background="Transparent">
+    <TextBlock x:Name="MessageTextBlock" Margin="10,10,10,10" IsHitTestVisible="False" TextWrapping="Wrap"></TextBlock>
+
+    <ToggleButton x:Name="SwitchRawPointerToggleButton" Content="Use Raw WM Pointer" Margin="10 10 10 10" VerticalAlignment="Bottom" Click="SwitchRawPointerToggleButton_OnClick"></ToggleButton>
+  </Grid>
 </UserControl>

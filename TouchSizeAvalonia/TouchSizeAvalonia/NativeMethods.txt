@@ -1,0 +1,14 @@
+﻿SetWindowsHookEx
+CallNextHookEx
+SetWindowLong
+SetWindowLongPtr
+SetWindowLongPtrW
+CallWindowProc
+PostMessage
+WM_POINTE*
+GetPointerDeviceProperties
+GetRawPointerDeviceData
+GetPointerTouchInfo
+GetPointerDeviceRects
+GetPointerDevices
+GetPointerCursorId
