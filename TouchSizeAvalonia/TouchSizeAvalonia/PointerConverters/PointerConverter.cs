@@ -172,15 +172,16 @@ internal static class PointerConverter
                 }
             }
 
-            if (rawPointerPoint != default)
-            {
-                // 默认调试只取一个点好了
-                break;
-            }
+            // 换成取最后一个点好了
+            //if (rawPointerPoint != default)
+            //{
+            //    // 默认调试只取一个点好了
+            //    break;
+            //}
         }
 
         touchInfo.AppendLine($"PointerPoint PointerId={pointerInfo.pointerId} XY={pointerInfo.ptPixelLocationRaw.X},{pointerInfo.ptPixelLocationRaw.Y} rc ContactXY={info.rcContactRaw.X},{info.rcContactRaw.Y} ContactWH={info.rcContactRaw.Width},{info.rcContactRaw.Height}");
-        touchInfo.AppendLine($"RawPointerPoint Id={rawPointerPoint.Id} XY={rawPointerPoint.X:0.00},{rawPointerPoint.Y:0.00} PixelWH={rawPointerPoint.PixelWidth:0.00},{rawPointerPoint.PixelHeight:0.00} PhysicalWH={rawPointerPoint.PhysicalWidth:0.00},{rawPointerPoint.PhysicalHeight:0.00}cm");
+        touchInfo.AppendLine($"RawPointerPoint Id={rawPointerPoint.Id} XY={rawPointerPoint.X:0.00},{rawPointerPoint.Y:0.00} PixelWH={rawPointerPoint.PixelWidth:0.00},{rawPointerPoint.PixelHeight:0.00} PhysicalWH={rawPointerPoint.PhysicalWidth:0.00},{rawPointerPoint.PhysicalHeight:0.00}cm HistoryCount={historyCount}");
 
         rawPointerPoint = rawPointerPoint with
         {
