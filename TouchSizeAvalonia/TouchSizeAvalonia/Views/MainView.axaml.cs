@@ -15,6 +15,7 @@ using Avalonia.Media;
 using System.Runtime.Versioning;
 using TouchSizeAvalonia.PointerConverters;
 using Point = Avalonia.Point;
+using Windows.Win32.UI.Input.Pointer;
 
 namespace TouchSizeAvalonia.Views;
 
@@ -31,24 +32,26 @@ public partial class MainView : UserControl
     }
 
 
-    readonly record struct PointInfo(
+    readonly record struct PointInfo
+    (
         double X,
         double Y,
         double Width,
         double Height,
         Border Border,
-        TextBlock TextBlock);
+        TextBlock TextBlock
+    );
 
     private readonly Dictionary<int /*Id*/, PointInfo> _dictionary = [];
 
-    private void MainView_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    private void MainView_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (SwitchRawPointerToggleButton.IsChecked is true)
         {
-            if (_rawPointerTextBlock is not null)
+            if (_rawPointerTextBlock is not null && e.Pointer.Type != PointerType.Mouse)
             {
-                var (x, y) = e.GetPosition(this);
-                _rawPointerTextBlock.Text += $"\r\n[Avalonia PointerMoved] Id={e.Pointer.Id} XY={x:0.00},{y:0.00}";
+                var (x, y) = e.GetPosition(null);
+                _rawPointerTextBlock.Text += $"\r\n[Avalonia PointerPressed] Id={e.Pointer.Id} XY={x:0.00},{y:0.00}";
             }
 
             return;
@@ -91,6 +94,17 @@ public partial class MainView : UserControl
 
     private void MainView_PointerMoved(object? sender, Avalonia.Input.PointerEventArgs e)
     {
+        if (SwitchRawPointerToggleButton.IsChecked is true)
+        {
+            if (_rawPointerTextBlock is not null && e.Pointer.Type != PointerType.Mouse)
+            {
+                var (x, y) = e.GetPosition(null);
+                _rawPointerTextBlock.Text += $"\r\n[Avalonia PointerMoved] Id={e.Pointer.Id} XY={x:0.00},{y:0.00}";
+            }
+
+            return;
+        }
+
         if (_dictionary.TryGetValue(e.Pointer.Id, out var info))
         {
             var currentPoint = e.GetCurrentPoint(null);
@@ -326,12 +340,17 @@ public partial class MainView : UserControl
 
 
             // 转换为 Avalonia 坐标系
+            global::Windows.Win32.Foundation.RECT pointerDeviceRect = default;
+            global::Windows.Win32.Foundation.RECT displayRect = default;
+
+            GetPointerTouchInfo(pointerId, out POINTER_TOUCH_INFO info);
+            GetPointerDeviceRects(info.pointerInfo.sourceDevice, &pointerDeviceRect, &displayRect);
 
             var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
             var originPointToScreen = this.PointToScreen(new Point(0, 0));
 
-            var xAvalonia = (rawPointerPoint.X - originPointToScreen.X) / scale;
-            var yAvalonia = (rawPointerPoint.Y - originPointToScreen.Y) / scale;
+            var xAvalonia = (rawPointerPoint.X + displayRect.left - originPointToScreen.X) / scale;
+            var yAvalonia = (rawPointerPoint.Y + displayRect.top - originPointToScreen.Y) / scale;
             var widthAvalonia = rawPointerPoint.PixelWidth / scale;
             var heightAvalonia = rawPointerPoint.PixelHeight / scale;
 
