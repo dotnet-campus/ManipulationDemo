@@ -1,9 +1,6 @@
 ﻿using System.Diagnostics;
-
 using CPF.Linux;
-
 using ManipulationDemoCpfX11.Utils;
-
 using SkiaSharp;
 
 using static CPF.Linux.XLib;
@@ -60,7 +57,7 @@ if (OperatingSystem.IsLinux())
         var edidInfo = readEdidInfoResult.EdidInfo;
         Console.WriteLine($"读取 Edid 成功，屏幕宽高：{edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value}cmx{edidInfo.BasicDisplayParameters.MonitorPhysicalHeight.Value}cm");
 
-        physicalWidth = (int) edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value;
+        physicalWidth = (int)edidInfo.BasicDisplayParameters.MonitorPhysicalWidth.Value;
         physicalHeight = (int) edidInfo.BasicDisplayParameters.MonitorPhysicalHeight.Value;
     }
     else
@@ -104,7 +101,7 @@ skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
 var touchMajorAtom = XInternAtom(display, "Abs MT Touch Major", false);
 var touchMinorAtom = XInternAtom(display, "Abs MT Touch Minor", false);
 var pressureAtom = XInternAtom(display, "Abs MT Pressure", false);
-var orientationAtom = XInternAtom(display, "Abs MT Orientation", false);
+var orientationAtom = XInternAtom(display, "Abs MT Orientation",false);
 
 Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(display, pressureAtom)} Abs_MT_Orientation={orientationAtom} Name={XLib.GetAtomName(display, orientationAtom)}");
 
@@ -307,7 +304,7 @@ while (true)
 
                             if (orientationValuatorClassInfo.HasValue)
                             {
-                                if (valuatorDictionary.TryGetValue(orientationValuatorClassInfo.Value.Number, out var value))
+                                if (valuatorDictionary.TryGetValue(orientationValuatorClassInfo.Value.Number,out var value))
                                 {
                                     Log($"Abs MT Orientation Value={value} Min={orientationValuatorClassInfo.Value.Min} Max={orientationValuatorClassInfo.Value.Max} Resolution={orientationValuatorClassInfo.Value.Resolution}");
                                 }
@@ -378,9 +375,7 @@ void Draw()
 
             skCanvas.DrawRect((float) (value.X - pixelWidth / 2), (float) (value.Y - pixelHeight / 2), (float) pixelWidth, (float) pixelHeight, skPaint);
 
-            //logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max} Resolution={touchMajorValuatorClassInfo.Value.Resolution}";
-
-            logMessage = $"Id={value.Id} Width: {pixelWidth:0.00}px {physicalWidthValue:0.00}cm(S) {value.TouchMajor / touchMajorValuatorClassInfo.Value.Resolution * 100d/*单位是0.1毫米，乘以100等于厘米*/:0.00}cm(R) Value={value.TouchMajor} MaxValuator={touchMajorValuatorClassInfo.Value.Max} Resolution={touchMajorValuatorClassInfo.Value.Resolution}";
+            logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max}";
         }
 
         skPaint.IsLinearText = false;
