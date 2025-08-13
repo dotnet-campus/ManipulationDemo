@@ -168,9 +168,17 @@ namespace CPF.Linux
 
         public static string? GetAtomName(IntPtr display, IntPtr atom)
         {
+            if (atom is 0)
+            {
+                return null;
+            }
+
             var ptr = XGetAtomName(display, atom);
             if (ptr == IntPtr.Zero)
+            {
                 return null;
+            }
+
             var s = Marshal.PtrToStringAnsi(ptr);
             XFree(ptr);
             return s;
