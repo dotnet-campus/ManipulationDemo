@@ -70,6 +70,8 @@ public unsafe class XIValuatorManager
                 XiEventType.XI_ButtonRelease,
                 XiEventType.XI_Leave,
                 XiEventType.XI_Enter,
+
+                XiEventType.XI_DeviceChanged,
             };
 
             XLib.XiSelectEvents(Display, _x11WindowXId,
