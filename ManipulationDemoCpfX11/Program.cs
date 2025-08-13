@@ -106,7 +106,7 @@ skPaint.Color = SKColors.Black;
 skCanvas.Clear(SKColors.White.WithAlpha(0x5C));
 
 var xiValuatorManager = new XIValuatorManager(display, handle);
-xiValuatorManager.UpdateValuator();
+xiValuatorManager.Init();
 
 var dictionary = new Dictionary<int, TouchInfo>();
 bool isSendExposeEvent = false;
@@ -242,7 +242,9 @@ while (true)
                 }
                 else if (xiEvent->evtype is XiEventType.XI_DeviceChanged)
                 {
-                    xiValuatorManager.UpdateValuator();
+                    var changed = (XIDeviceChangedEvent*) xiEvent;
+
+                    xiValuatorManager.UpdateValuators(changed->Classes, changed->NumClasses);
                 }
             }
             finally

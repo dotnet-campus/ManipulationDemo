@@ -22,22 +22,8 @@ public unsafe class XIValuatorManager
 
     public IntPtr Display { get; }
 
-    public void UpdateValuator()
+    public void Init()
     {
-        Console.WriteLine($"Start UpdateValuator ============");
-
-        TouchMajorValuatorClassInfo = null;
-        TouchMinorValuatorClassInfo = null;
-        PressureValuatorClassInfo = null;
-        OrientationValuatorClassInfo = null;
-
-        var touchMajorAtom = XLib.XInternAtom(Display, "Abs MT Touch Major", false);
-        var touchMinorAtom = XLib.XInternAtom(Display, "Abs MT Touch Minor", false);
-        var pressureAtom = XLib.XInternAtom(Display, "Abs MT Pressure", false);
-        var orientationAtom = XLib.XInternAtom(Display, "Abs MT Orientation", false);
-
-        Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(Display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(Display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(Display, pressureAtom)} Abs_MT_Orientation={orientationAtom} Name={XLib.GetAtomName(Display, orientationAtom)}");
-
         var devices = (XIDeviceInfo*) XLib.XIQueryDevice(Display,
             (int) XiPredefinedDeviceId.XIAllMasterDevices, out int num);
 
@@ -56,9 +42,6 @@ public unsafe class XIValuatorManager
 
         if (pointerDevice != null)
         {
-            var valuators = new List<XIValuatorClassInfo>();
-            var scrollers = new List<XIScrollClassInfo>();
-
             var multiTouchEventTypes = new List<XiEventType>
             {
                 XiEventType.XI_TouchBegin,
@@ -77,58 +60,80 @@ public unsafe class XIValuatorManager
             XLib.XiSelectEvents(Display, _x11WindowXId,
                 new Dictionary<int, List<XiEventType>> { [pointerDevice.Value.Deviceid] = multiTouchEventTypes });
 
-            for (int i = 0; i < pointerDevice.Value.NumClasses; i++)
+            UpdateValuators(pointerDevice.Value.Classes, pointerDevice.Value.NumClasses);
+        }
+    }
+
+    public void UpdateValuators(XIAnyClassInfo** classes, int num)
+    {
+        Console.WriteLine($"Start UpdateValuator ============");
+
+        TouchMajorValuatorClassInfo = null;
+        TouchMinorValuatorClassInfo = null;
+        PressureValuatorClassInfo = null;
+        OrientationValuatorClassInfo = null;
+
+        var touchMajorAtom = XLib.XInternAtom(Display, "Abs MT Touch Major", false);
+        var touchMinorAtom = XLib.XInternAtom(Display, "Abs MT Touch Minor", false);
+        var pressureAtom = XLib.XInternAtom(Display, "Abs MT Pressure", false);
+        var orientationAtom = XLib.XInternAtom(Display, "Abs MT Orientation", false);
+
+        Console.WriteLine($"ABS_MT_TOUCH_MAJOR={touchMajorAtom} Name={XLib.GetAtomName(Display, touchMajorAtom)} ABS_MT_TOUCH_MINOR={touchMinorAtom} Name={XLib.GetAtomName(Display, touchMinorAtom)} Abs_MT_Pressure={pressureAtom} Name={XLib.GetAtomName(Display, pressureAtom)} Abs_MT_Orientation={orientationAtom} Name={XLib.GetAtomName(Display, orientationAtom)}");
+
+        var valuators = new List<XIValuatorClassInfo>();
+        var scrollers = new List<XIScrollClassInfo>();
+
+        for (int i = 0; i < num; i++)
+        {
+            var xiAnyClassInfo = classes[i];
+            if (xiAnyClassInfo->Type == XiDeviceClass.XIValuatorClass)
             {
-                var xiAnyClassInfo = pointerDevice.Value.Classes[i];
-                if (xiAnyClassInfo->Type == XiDeviceClass.XIValuatorClass)
-                {
-                    valuators.Add(*((XIValuatorClassInfo**) pointerDevice.Value.Classes)[i]);
-                }
-                else if (xiAnyClassInfo->Type == XiDeviceClass.XIScrollClass)
-                {
-                    scrollers.Add(*((XIScrollClassInfo**) pointerDevice.Value.Classes)[i]);
-                }
+                valuators.Add(*((XIValuatorClassInfo**) classes)[i]);
             }
-
-            foreach (var xiValuatorClassInfo in valuators)
+            else if (xiAnyClassInfo->Type == XiDeviceClass.XIScrollClass)
             {
-                if (xiValuatorClassInfo.Label == touchMajorAtom)
-                {
-                    Console.WriteLine(
-                        $"TouchMajorAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
-
-                    TouchMajorValuatorClassInfo = xiValuatorClassInfo;
-                }
-                else if (xiValuatorClassInfo.Label == touchMinorAtom)
-                {
-                    Console.WriteLine(
-                        $"TouchMinorAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
-
-                    TouchMinorValuatorClassInfo = xiValuatorClassInfo;
-                }
-                else if (xiValuatorClassInfo.Label == pressureAtom)
-                {
-                    Console.WriteLine(
-                        $"PressureAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
-
-                    PressureValuatorClassInfo = xiValuatorClassInfo;
-                }
-                else if (xiValuatorClassInfo.Label == orientationAtom)
-                {
-                    Console.WriteLine(
-                        $"OrientationAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
-                    OrientationValuatorClassInfo = xiValuatorClassInfo;
-                }
-                else
-                {
-                    Console.WriteLine($"XiValuatorClassInfo Label={xiValuatorClassInfo.Label}({XLib.GetAtomName(Display, xiValuatorClassInfo.Label)} Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution})");
-                }
+                scrollers.Add(*((XIScrollClassInfo**) classes)[i]);
             }
+        }
 
-            if (TouchMajorValuatorClassInfo is null)
+        foreach (var xiValuatorClassInfo in valuators)
+        {
+            if (xiValuatorClassInfo.Label == touchMajorAtom)
             {
-                Console.WriteLine("Can't find TouchMajorAtom 丢失触摸宽度高度");
+                Console.WriteLine(
+                    $"TouchMajorAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}; Sourceid={xiValuatorClassInfo.Sourceid}");
+
+                TouchMajorValuatorClassInfo = xiValuatorClassInfo;
             }
+            else if (xiValuatorClassInfo.Label == touchMinorAtom)
+            {
+                Console.WriteLine(
+                    $"TouchMinorAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}; Sourceid={xiValuatorClassInfo.Sourceid}");
+
+                TouchMinorValuatorClassInfo = xiValuatorClassInfo;
+            }
+            else if (xiValuatorClassInfo.Label == pressureAtom)
+            {
+                Console.WriteLine(
+                    $"PressureAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
+
+                PressureValuatorClassInfo = xiValuatorClassInfo;
+            }
+            else if (xiValuatorClassInfo.Label == orientationAtom)
+            {
+                Console.WriteLine(
+                    $"OrientationAtom Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution}");
+                OrientationValuatorClassInfo = xiValuatorClassInfo;
+            }
+            else
+            {
+                Console.WriteLine($"XiValuatorClassInfo Label={xiValuatorClassInfo.Label}({XLib.GetAtomName(Display, xiValuatorClassInfo.Label)} Value={xiValuatorClassInfo.Value}; Max={xiValuatorClassInfo.Max:0.00}; Min={xiValuatorClassInfo.Min:0.00}; Resolution={xiValuatorClassInfo.Resolution})");
+            }
+        }
+
+        if (TouchMajorValuatorClassInfo is null)
+        {
+            Console.WriteLine("Can't find TouchMajorAtom 丢失触摸宽度高度");
         }
         else
         {
