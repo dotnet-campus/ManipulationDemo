@@ -232,8 +232,17 @@ while (true)
                             };
                         }
                     }
-                    
+                    else if (xiEvent->evtype is XiEventType.XI_Motion)
+                    {
+                        dictionary[xiDeviceEvent->detail] = new TouchInfo(xiDeviceEvent->detail, x, y, -1, -1, TouchStatus.Move);
+                        LogTouchInfo(dictionary[xiDeviceEvent->detail]);
+                    }
+
                     InvalidateVisual();
+                }
+                else if (xiEvent->evtype is XiEventType.XI_DeviceChanged)
+                {
+                    xiValuatorManager.UpdateValuator();
                 }
             }
             finally

@@ -26,6 +26,11 @@ public unsafe class XIValuatorManager
     {
         Console.WriteLine($"Start UpdateValuator ============");
 
+        TouchMajorValuatorClassInfo = null;
+        TouchMinorValuatorClassInfo = null;
+        PressureValuatorClassInfo = null;
+        OrientationValuatorClassInfo = null;
+
         var touchMajorAtom = XLib.XInternAtom(Display, "Abs MT Touch Major", false);
         var touchMinorAtom = XLib.XInternAtom(Display, "Abs MT Touch Minor", false);
         var pressureAtom = XLib.XInternAtom(Display, "Abs MT Pressure", false);

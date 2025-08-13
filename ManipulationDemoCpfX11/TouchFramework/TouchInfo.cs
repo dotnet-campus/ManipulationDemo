@@ -12,8 +12,6 @@ public record TouchInfo(int Id, double X, double Y, double TouchMajor, double To
 {
     public TouchSize GetTouchSize(XIValuatorManager valuatorManager, int edidPhysicalWidth, int edidPhysicalHeight)
     {
-        var value = this;
-
         var display = valuatorManager.Display;
         var screen = XDefaultScreen(display);
         var xDisplayWidth = XDisplayWidth(display, screen);
@@ -24,9 +22,14 @@ public record TouchInfo(int Id, double X, double Y, double TouchMajor, double To
         double physicalWidthValue = double.NaN;
         double physicalHeightValue = double.NaN;
 
+        if (TouchMajor < 0 && TouchMinor < 0)
+        {
+            return new TouchSize(-1, -1, -1, -1);
+        }
+
         if (valuatorManager.TouchMajorValuatorClassInfo is not null)
         {
-            var touchMajorScale = value.TouchMajor / valuatorManager.TouchMajorValuatorClassInfo.Value.Max;
+            var touchMajorScale = TouchMajor / valuatorManager.TouchMajorValuatorClassInfo.Value.Max;
             pixelWidth = touchMajorScale * xDisplayWidth;
 
             if (edidPhysicalWidth > 0)
@@ -41,7 +44,7 @@ public record TouchInfo(int Id, double X, double Y, double TouchMajor, double To
         }
         else
         {
-            var touchMinorScale = value.TouchMinor / valuatorManager.TouchMinorValuatorClassInfo.Value.Max;
+            var touchMinorScale = TouchMinor / valuatorManager.TouchMinorValuatorClassInfo.Value.Max;
             pixelHeight = touchMinorScale * xDisplayHeight;
 
             if (edidPhysicalHeight > 0)
