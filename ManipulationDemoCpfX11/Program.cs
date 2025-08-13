@@ -370,7 +370,7 @@ void LogTouchInfo(TouchInfo value)
         }
     }
 
-    logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuatorMax={touchMajorValuatorClassInfo.Value.Max} MinorValuatorMax={touchMinorValuatorClassInfo?.Max}";
+    logMessage += $" W={pixelWidth:0.00}px,{physicalWidthValue:0.00}cm H={pixelHeight:0.00}px,{physicalHeightValue:0.00}cm MajorValuatorMax={touchMajorValuatorClassInfo?.Max:0.00} MinorValuatorMax={touchMinorValuatorClassInfo?.Max:0.00}";
 
     Log(logMessage);
 }
