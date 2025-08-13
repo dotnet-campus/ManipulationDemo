@@ -92,11 +92,12 @@ skPaint.Style = SKPaintStyle.Stroke;
 skPaint.IsAntialias = true;
 
 // 随意用一个支持中文的字体
-var typeface = SKFontManager.Default.MatchCharacter('十');
+SKTypeface typeface = SKFontManager.Default.MatchCharacter('十');
+Console.WriteLine($"选用字体： SKTypeface={typeface?.FamilyName ?? "<null>"}");
 skPaint.TextSize = 20;
 skPaint.Typeface = typeface;
 skPaint.Color = SKColors.Black;
-skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
+skCanvas.Clear(SKColors.White.WithAlpha(0x5C));
 
 var touchMajorAtom = XInternAtom(display, "Abs MT Touch Major", false);
 var touchMinorAtom = XInternAtom(display, "Abs MT Touch Minor", false);
@@ -251,9 +252,9 @@ while (true)
                     }
                     else if (xiEvent->evtype == XiEventType.XI_TouchUpdate)
                     {
-                        if (dictionary.TryGetValue(xiDeviceEvent->detail, out var t))
+                        if (dictionary.TryGetValue(xiDeviceEvent->detail, out var touchInfo))
                         {
-                            t = t with
+                            touchInfo = touchInfo with
                             {
                                 X = x,
                                 Y = y,
@@ -276,7 +277,7 @@ while (true)
                             {
                                 if (valuatorDictionary.TryGetValue(touchMajorValuatorClassInfo.Value.Number, out var value) && (!ignoreZeroWidthHeight || value != 0))
                                 {
-                                    t = t with
+                                    touchInfo = touchInfo with
                                     {
                                         TouchMajor = value,
                                     };
@@ -291,7 +292,7 @@ while (true)
                             {
                                 if (valuatorDictionary.TryGetValue(touchMinorValuatorClassInfo.Value.Number, out var value) && (!ignoreZeroWidthHeight || value != 0))
                                 {
-                                    t = t with
+                                    touchInfo = touchInfo with
                                     {
                                         TouchMinor = value,
                                     };
@@ -302,15 +303,16 @@ while (true)
                                 }
                             }
 
-                            if (orientationValuatorClassInfo.HasValue)
-                            {
-                                if (valuatorDictionary.TryGetValue(orientationValuatorClassInfo.Value.Number,out var value))
-                                {
-                                    Log($"Abs MT Orientation Value={value} Min={orientationValuatorClassInfo.Value.Min} Max={orientationValuatorClassInfo.Value.Max} Resolution={orientationValuatorClassInfo.Value.Resolution}");
-                                }
-                            }
+                            //if (orientationValuatorClassInfo.HasValue)
+                            //{
+                            //    if (valuatorDictionary.TryGetValue(orientationValuatorClassInfo.Value.Number,out var value))
+                            //    {
+                            //        Log($"Abs MT Orientation Value={value} Min={orientationValuatorClassInfo.Value.Min} Max={orientationValuatorClassInfo.Value.Max} Resolution={orientationValuatorClassInfo.Value.Resolution}");
+                            //    }
+                            //}
 
-                            dictionary[xiDeviceEvent->detail] = t;
+                            dictionary[xiDeviceEvent->detail] = touchInfo;
+                            LogTouchInfo(touchInfo);
                         }
                     }
                     else if (xiEvent->evtype == XiEventType.XI_TouchEnd)
@@ -337,14 +339,47 @@ while (true)
     }
 }
 
+void LogTouchInfo(TouchInfo value)
+{
+    string logMessage = $"Id={value.Id};X={value.X} Y={value.Y};TouchMajor={value.TouchMajor} TouchMinor={value.TouchMinor}";
+
+    var touchMajorScale = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max;
+    double pixelWidth = touchMajorScale * xDisplayWidth;
+    double pixelHeight;
+    double physicalWidthValue = double.NaN;
+    double physicalHeightValue = double.NaN;
+
+    if (physicalWidth > 0)
+    {
+        physicalWidthValue = touchMajorScale * physicalWidth;
+    }
+
+    if (touchMinorValuatorClassInfo is null)
+    {
+        pixelHeight = pixelWidth;
+    }
+    else
+    {
+        var touchMinorScale = value.TouchMinor / touchMinorValuatorClassInfo.Value.Max;
+        pixelHeight = touchMinorScale * xDisplayHeight;
+
+        if (physicalHeight > 0)
+        {
+            physicalHeightValue = touchMinorScale * physicalHeight;
+        }
+    }
+
+    logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuatorMax={touchMajorValuatorClassInfo.Value.Max} MinorValuatorMax={touchMinorValuatorClassInfo?.Max}";
+
+    Log(logMessage);
+}
+
 void Draw()
 {
-    skCanvas.Clear(SKColors.White.WithAlpha(0x6C));
+    skCanvas.Clear(SKColors.White.WithAlpha(0x2C));
 
     foreach (var value in dictionary.Values)
     {
-        string logMessage = $"Id={value.Id};X={value.X} Y={value.Y};TouchMajor={value.TouchMajor} TouchMinor={value.TouchMinor}";
-
         if (touchMajorValuatorClassInfo != null)
         {
             var touchMajorScale = value.TouchMajor / touchMajorValuatorClassInfo.Value.Max;
@@ -374,8 +409,6 @@ void Draw()
             }
 
             skCanvas.DrawRect((float) (value.X - pixelWidth / 2), (float) (value.Y - pixelHeight / 2), (float) pixelWidth, (float) pixelHeight, skPaint);
-
-            logMessage += $" W={pixelWidth}px,{physicalWidthValue}cm H={pixelHeight}px,{physicalHeightValue}cm MajorValuator={touchMajorValuatorClassInfo.Value.Max} MinorValuator={touchMinorValuatorClassInfo?.Max}";
         }
 
         skPaint.IsLinearText = false;
@@ -388,8 +421,6 @@ void Draw()
         }
 
         skCanvas.DrawText(text, (float) value.X, (float) value.Y, skPaint);
-
-        Log(logMessage);
     }
 
     if (isSendExposeEvent)
