@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-using CPF.Linux;
+﻿using CPF.Linux;
 
 using ManipulationDemoCpfX11.TouchFramework;
 using ManipulationDemoCpfX11.Utils;
@@ -126,6 +124,7 @@ while (true)
 
     if (@event.type == XEventName.Expose)
     {
+        Draw();
         XPutImage(display, handle, gc, ref xImage, @event.ExposeEvent.x, @event.ExposeEvent.y, @event.ExposeEvent.x, @event.ExposeEvent.y, (uint) @event.ExposeEvent.width,
             (uint) @event.ExposeEvent.height);
         isSendExposeEvent = false;
@@ -233,13 +232,13 @@ while (true)
                             };
                         }
                     }
-
-                    Draw();
+                    
+                    InvalidateVisual();
                 }
             }
             finally
             {
-
+                XFreeEventData(display, data);
             }
         }
     }
@@ -261,6 +260,17 @@ void LogTouchInfo(TouchInfo value)
     Log(logMessage);
 }
 
+void InvalidateVisual()
+{
+    if (isSendExposeEvent)
+    {
+        return;
+    }
+
+    SendExposeEvent(display, handle, 0, 0, width, height);
+    isSendExposeEvent = true;
+}
+
 void Draw()
 {
     skCanvas.Clear(SKColors.White.WithAlpha(0x2C));
@@ -279,7 +289,7 @@ void Draw()
 
         skPaint.IsLinearText = false;
         var text = $"""
-                    Id={value.Id};X={value.X} Y={value.Y};W={value.TouchMajor} H={value.TouchMinor}
+                    Id={value.Id};X={value.X:0.00} Y={value.Y:0.00};W={value.TouchMajor:0.00} H={value.TouchMinor:0.00}
                     """;
         if (value.TouchStatus == TouchStatus.Up)
         {
@@ -290,14 +300,6 @@ void Draw()
         skCanvas.DrawText(text, (float) value.X, (float) value.Y, skPaint);
         skPaint.Style = SKPaintStyle.Stroke;
     }
-
-    if (isSendExposeEvent)
-    {
-        return;
-    }
-
-    SendExposeEvent(display, handle, 0, 0, width, height);
-    isSendExposeEvent = true;
 }
 
 void Log(string message)
