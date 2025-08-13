@@ -1,1 +1,1 @@
-本文件夹代码从 https://gitee.com/csharpui/CPF 拷贝
+﻿本文件夹代码从 https://gitee.com/csharpui/CPF 和 https://github.com/AvaloniaUI/Avalonia 拷贝

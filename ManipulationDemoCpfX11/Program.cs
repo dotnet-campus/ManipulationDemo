@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using CPF.Linux;
+using ManipulationDemoCpfX11.TouchFramework;
 using ManipulationDemoCpfX11.Utils;
 using SkiaSharp;
 
@@ -420,7 +421,9 @@ void Draw()
             text = "[已抬起];" + text;
         }
 
+        skPaint.Style = SKPaintStyle.Fill;
         skCanvas.DrawText(text, (float) value.X, (float) value.Y, skPaint);
+        skPaint.Style = SKPaintStyle.Stroke;
     }
 
     if (isSendExposeEvent)
@@ -489,13 +492,3 @@ static void SendExposeEvent(IntPtr display, IntPtr window, int x, int y, int wid
     XFlush(display);
 }
 
-record TouchInfo(int Id, double X, double Y, double TouchMajor, double TouchMinor, TouchStatus TouchStatus)
-{
-}
-
-enum TouchStatus
-{
-    Down,
-    Move,
-    Up,
-}
